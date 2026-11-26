@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ハルカ 教育AI 改良版｜ウィキペディア検索</title>
+<style>
+  body{margin:0;font-family:sans-serif;background:#050a14;color:#e8eef7}
+  .wrap{max-width:760px;margin:0 auto;padding:18px 14px 40px}
+  h1{font-size:1.35rem;color:#ffd700;margin:8px 0 2px}
+  .status{color:#7ee2a8;font-size:.85rem;margin-bottom:12px}
+  .card{background:#0b1526;border:1px solid #2b4a77;border-radius:12px;padding:16px;margin-top:14px}
+  .card h2{font-size:1.05rem;color:#ffd700;margin:0 0 10px}
+  label{font-size:.9rem;color:#bcd}
+  select,input[type=text]{width:100%;box-sizing:border-box;padding:11px;border-radius:8px;border:1px solid #ffd700;background:#050a14;color:#fff;font-size:1rem;margin:6px 0 10px}
+  button.send{width:100%;padding:12px;border:none;border-radius:8px;background:#ffd700;color:#111;font-weight:700;font-size:1rem;cursor:pointer}
+  .topics{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+  .topics button{padding:8px 12px;border-radius:999px;border:1px solid #2b4a77;background:#12233f;color:#dbeafe;cursor:pointer}
+  #answerBox{line-height:1.8;font-size:1rem;white-space:pre-wrap}
+  #answerBox .src{font-size:.8rem;color:#9fb3c8;margin-top:6px}
+  #answerBox a{color:#7cc4ff}
+  .note{font-size:.8rem;color:#9fb3c8;margin-top:10px}
+  .hit{border-left:3px solid #3b82f6;padding-left:10px;margin-bottom:14px}
+  footer{margin-top:26px;font-size:.85rem;color:#9fb3c8}
+  footer a{color:#7cc4ff}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 id="appTitle">ハルカ 教育AI 改良版</h1>
+  <div class="status" id="statusText">● 教育AI稼働中（ウィキペディア検索型）</div>
+
+  <div class="card">
+    <h2 id="libraryHeading">調べる（ウィキペディア検索）</h2>
+    <label id="langLabel">言語 / Language</label>
+    <select id="langSelect">
+      <option value="ja" selected>日本語</option>
+      <option value="en">English</option>
+      <option value="zh-CN">中文（簡体）</option>
+      <option value="es">Español</option>
+      <option value="pt">Português</option>
+      <option value="fr">Français</option>
+      <option value="de">Deutsch</option>
+      <option value="ru">Русский</option>
+      <option value="ko">한국어</option>
+    </select>
+    <label id="qHeading">質問</label>
+    <input type="text" id="questionBox" placeholder="例：水の循環とは何ですか？">
+    <button class="send" id="sendBtn" onclick="doSearch()">送信</button>
+    <div class="topics" id="topics"></div>
+    <p class="note" id="bodyNote">まず内蔵の小さな教科書を探し、無ければウィキペディアで調べます。</p>
+  </div>
+
+  <div class="card">
+    <h2 id="aHeading">解答</h2>
+    <div id="answerBox"></div>
+  </div>
+
+  <footer>
+    <p><a href="https://xyz7963gold79-glitch.github.io/origiss8/">元のハルカ教育AI v42（テンプレート型）はこちら</a></p>
+    <p>制作：女子会</p>
+  </footer>
+</div>
+<script>
+const UI_DICT = {
+  ja:{appTitle:"ハルカ 教育AI 改良版",libraryHeading:"調べる（ウィキペディア検索）",qHeading:"質問",aHeading:"解答",sendBtn:"送信",statusText:"● 教育AI稼働中（ウィキペディア検索型）",bodyNote:"まず内蔵の小さな教科書を探し、無ければウィキペディアで調べます。",notFound:"見つかりませんでした。言葉を変えて、もう一度調べてみてください。",placeholder:"例：水の循環とは何ですか？",searching:"調べています…",builtinSrc:"内蔵の教科書"},
+  en:{appTitle:"Haruka Education AI — Improved",libraryHeading:"Look it up (Wikipedia search)",qHeading:"Question",aHeading:"Answer",sendBtn:"Send",statusText:"● Education AI is running (Wikipedia search)",bodyNote:"First we search the small built-in textbook; if not found, we search Wikipedia.",notFound:"Not found. Please try different words.",placeholder:"e.g., What is the water cycle?",searching:"Searching…",builtinSrc:"Built-in textbook"},
+  "zh-CN":{appTitle:"春香教育AI 改良版",libraryHeading:"查询（维基百科搜索）",qHeading:"问题",aHeading:"回答",sendBtn:"发送",statusText:"● 教育AI运行中（维基百科搜索型）",bodyNote:"先查内藏的小教科书，没有再查维基百科。",notFound:"没有找到。请换个词再试。",placeholder:"例如：什么是水循环？",searching:"正在查询…",builtinSrc:"内藏教科书"},
+  es:{appTitle:"Haruka IA Educativa — Mejorada",libraryHeading:"Consultar (búsqueda en Wikipedia)",qHeading:"Pregunta",aHeading:"Respuesta",sendBtn:"Enviar",statusText:"● IA educativa en funcionamiento (búsqueda en Wikipedia)",bodyNote:"Primero buscamos en el pequeño libro interno; si no está, buscamos en Wikipedia.",notFound:"No se encontró. Pruebe con otras palabras.",placeholder:"Ej: ¿Qué es el ciclo del agua?",searching:"Buscando…",builtinSrc:"Libro interno"},
+  pt:{appTitle:"Haruka IA Educacional — Melhorada",libraryHeading:"Pesquisar (busca na Wikipédia)",qHeading:"Pergunta",aHeading:"Resposta",sendBtn:"Enviar",statusText:"● IA educacional em funcionamento (busca na Wikipédia)",bodyNote:"Primeiro buscamos no pequeno livro interno; se não houver, buscamos na Wikipédia.",notFound:"Não encontrado. Tente outras palavras.",placeholder:"Ex: O que é o ciclo da água?",searching:"Pesquisando…",builtinSrc:"Livro interno"}
+};
+UI_DICT["zh"] = UI_DICT["zh-CN"];
+UI_DICT["pt-BR"] = UI_DICT["pt"];
+let curLang = "ja";
+function langPack(code){
+  if (UI_DICT[code]) return UI_DICT[code];
+  const base = (code||"").split("-")[0];
+  return UI_DICT[base] || UI_DICT.en;
+}
+function wikiLang(code){
+  if (code === "zh-CN" || code === "zh") return "zh";
+  if (code === "pt-BR") return "pt";
+  return (code||"ja").split("-")[0];
+}
+function applyLang(code){
+  curLang = UI_DICT[code] ? code : ((code||"").split("-")[0] in UI_DICT ? (code||"").split("-")[0] : "en");
+  if (curLang === "zh") curLang = "zh-CN";
+  const t = langPack(curLang);
+  document.getElementById("appTitle").textContent = t.appTitle;
+  document.getElementById("libraryHeading").textContent = t.libraryHeading;
+  document.getElementById("qHeading").textContent = t.qHeading;
+  document.getElementById("aHeading").textContent = t.aHeading;
+  document.getElementById("sendBtn").textContent = t.sendBtn;
+  document.getElementById("statusText").textContent = t.statusText;
+  document.getElementById("bodyNote").textContent = t.bodyNote;
+  document.getElementById("questionBox").placeholder = t.placeholder;
+  window.currentLang = curLang;
+}
+const BUILTIN = [
+ {bookTitle:"理科",chapterTitle:"水の循環",text:"水の循環とは、海や陸の水が太陽の熱で蒸発して水蒸気になり、空で冷えて雲になり、雨や雪として降り、川となって海へ戻る、大きなめぐりのことです。このめぐりがあるため、地球の水は減らずに使い続けられます。"},
+ {bookTitle:"理科",chapterTitle:"光合成",text:"光合成とは、植物が太陽の光と水と空気中の二酸化炭素を使って、自分の栄養（でんぷん）を作る働きです。この時、酸素が空気中へ出ます。人や動物が吸う酸素は、植物の光合成から来ています。"},
+ {bookTitle:"理科",chapterTitle:"地球の自転と昼と夜",text:"地球は、北極と南極を結ぶ軸を中心に、1日に1回、自分で回っています。これを自転といいます。太陽の光が当たっている所が昼、反対側が夜になり、自転のため昼と夜が繰り返します。"},
+ {bookTitle:"理科",chapterTitle:"月",text:"月は地球の周りを約27日で1周しています。月そのものは光らず、太陽の光を反射して光って見えます。光の当たり方で、満月・半月・三日月のように形が変わって見えます。"},
+ {bookTitle:"理科",chapterTitle:"虹",text:"虹は、雨上がりに空中の小さな水滴の中で太陽の光が分かれて、色の帯になって見えるものです。太陽と反対側の空に、雨と太陽光がある時に見えます。"},
+ {bookTitle:"算数",chapterTitle:"分数",text:"分数は、1つのものを同じ大きさに分けたうちの、いくつ分かを表す数です。例えば1/2は、1つを2つに分けた1つ分です。下の数を分母、上の数を分子といいます。ピザやケーキを分ける時に使います。"},
+ {bookTitle:"体のこと",chapterTitle:"心臓",text:"心臓は、胸の中にある、血液を送り出すポンプです。縮んだり広がったりして、体中に血液を送り、酸素や栄養を届けます。大人の心臓は、1日に約10万回打ちます。"},
+ {bookTitle:"社会",chapterTitle:"信濃川",text:"信濃川は、長野県から新潟県へ流れて日本海に注ぐ、長さ約367kmの、日本で一番長い川です。長野県では千曲川と呼ばれます。流域の人々の暮らしと、田畑を支えてきました。"}
+];
+function getAllParagraphs(){ return BUILTIN; }
+function extractKeywords(text) {
+  if (!text) return [];
+  const cleaned = text.replace(/[！？。、「」『』（）()!?,.\n\r]/g, " ");
+  const re = /[一-龠ぁ-んァ-ンー]{2,}|[A-Za-z0-9]{2,}/g;
+  const raw = cleaned.match(re) || [];
+  const split = cleaned.split(/\s+/).filter(w => w.length >= 2);
+  const merged = [...raw, ...split];
+  const stop = new Set(["とは","とは何","何ですか","ですか","です","ます","について","教えて","ください","とは何ですか","これ","それ","the","what","is","are","a","an","de","la","el","en","que","para","com","por"]);
+  const uniq = [];
+  const seen = new Set();
+  for (let w of merged) {
+    const k = w.toLowerCase().trim();
+    if (k.length < 2) continue;
+    if (stop.has(k)) continue;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    uniq.push(k);
+    if (uniq.length >= 12) break;
+  }
+  // 日本語の文は単語に分かれないため、2文字の部分文字列も候補に加える
+  const grams = [];
+  for (let w of raw) {
+    if (/^[一-龠ぁ-んァ-ンー]+$/.test(w) && w.length >= 3) {
+      for (let i = 0; i + 2 <= w.length; i++) grams.push(w.slice(i, i + 2));
+    }
+  }
+  for (let g of grams) {
+    if (uniq.length >= 12) break;
+    if (stop.has(g)) continue;
+    if (seen.has(g)) continue;
+    seen.add(g);
+    uniq.push(g);
+  }
+  return uniq;
+}
+function searchParagraphs(keywords) {
+  if (!keywords || keywords.length === 0) return [];
+  const all = getAllParagraphs();
+  const results = [];
+  for (let i = 0; i < all.length; i++) {
+    const item = all[i];
+    const lower = item.text.toLowerCase();
+    let hit = 0;
+    const matched = [];
+    for (let kw of keywords) {
+      if (lower.includes(kw)) { hit++; matched.push(kw); }
+    }
+    if (hit > 0) {
+      results.push({ bookTitle: item.bookTitle, chapterTitle: item.chapterTitle, text: item.text, matchedKeywords: matched, score: hit, sourceLabel: "出典：" + item.bookTitle + " " + item.chapterTitle });
+    }
+  }
+  results.sort((a, b) => b.score - a.score);
+  return results.slice(0, 3);
+}
+async function doSearch() {
+  const qEl = document.getElementById("questionBox");
+  const aEl = document.getElementById("answerBox");
+  const t = langPack(curLang);
+  const q = qEl.value.trim();
+  if (!q) return;
+  const keywords = extractKeywords(q);
+  let hits = searchParagraphs(keywords);
+  // 章の題名がそのまま質問に含まれていれば、その段落を先頭にする
+  const titleHit = BUILTIN.find(b => q.includes(b.chapterTitle));
+  if (titleHit) {
+    hits = hits.filter(h => h.chapterTitle !== titleHit.chapterTitle);
+    hits.unshift({ bookTitle: titleHit.bookTitle, chapterTitle: titleHit.chapterTitle, text: titleHit.text, matchedKeywords: [titleHit.chapterTitle], score: 99, sourceLabel: "出典：" + titleHit.bookTitle + " " + titleHit.chapterTitle });
+  }
+  if (hits.length > 0) {
+    aEl.innerHTML = "";
+    hits.forEach(h => {
+      const div = document.createElement("div");
+      div.className = "hit";
+      const p = document.createElement("div");
+      p.textContent = h.text;
+      const src = document.createElement("div");
+      src.className = "src";
+      src.textContent = h.sourceLabel + "（" + t.builtinSrc + "）";
+      div.appendChild(p);
+      div.appendChild(src);
+      aEl.appendChild(div);
+    });
+    return;
+  }
+  aEl.textContent = t.searching;
+  const wl = wikiLang(curLang);
+  const url = "https://" + wl + ".wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=" + encodeURIComponent(q) + "&gsrlimit=3&prop=extracts&exintro&explaintext&format=json&origin=*";
+  try {
+    const r = await fetch(url);
+    const j = await r.json();
+    const pages = j && j.query && j.query.pages ? Object.values(j.query.pages) : [];
+    pages.sort((a,b) => (a.index||0) - (b.index||0));
+    const withText = pages.filter(p => p.extract && p.extract.trim().length > 0);
+    if (withText.length === 0) { aEl.textContent = t.notFound; return; }
+    aEl.innerHTML = "";
+    withText.forEach(p => {
+      const div = document.createElement("div");
+      div.className = "hit";
+      const body = document.createElement("div");
+      body.textContent = p.extract.length > 500 ? p.extract.slice(0, 500) + "…" : p.extract;
+      const src = document.createElement("div");
+      src.className = "src";
+      const a = document.createElement("a");
+      a.href = "https://" + wl + ".wikipedia.org/wiki/" + encodeURIComponent(p.title);
+      a.target = "_blank";
+      a.rel = "noopener";
+      a.textContent = "出典：Wikipedia「" + p.title + "」";
+      src.appendChild(a);
+      div.appendChild(body);
+      div.appendChild(src);
+      aEl.appendChild(div);
+    });
+  } catch (e) {
+    aEl.textContent = t.notFound;
+  }
+}
+document.getElementById("questionBox").addEventListener("keydown", e => { if (e.key === "Enter") doSearch(); });
+document.getElementById("langSelect").addEventListener("change", e => applyLang(e.target.value));
+const TOPICS = ["水の循環","光合成","分数","地球の自転","月","心臓","虹","信濃川"];
+const topicsEl = document.getElementById("topics");
+TOPICS.forEach(name => {
+  const b = document.createElement("button");
+  b.textContent = name;
+  b.onclick = () => { document.getElementById("questionBox").value = name + "とは何ですか？"; doSearch(); };
+  topicsEl.appendChild(b);
+});
+applyLang("ja");
+</script>
+</body>
+</html>

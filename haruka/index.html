@@ -57,6 +57,7 @@
     <div>
       <button class="subbtn" id="readBtn" onclick="toggleBooks()">教科書を読む</button>
       <button class="subbtn" id="fontBtn" onclick="toggleFont()">文字を大きく</button>
+      <button class="subbtn" id="voiceBtn" onclick="toggleVoice()">声で聞く</button>
     </div>
     <div id="bookList" style="display:none"></div>
   </div>
@@ -312,6 +313,24 @@ function toggleBooks() {
   const el = document.getElementById("bookList");
   if (el.style.display === "none") { renderBooks(); el.style.display = "block"; }
   else { el.style.display = "none"; }
+}
+
+// ===== 読み上げ（端末の音声で答えを読む） =====
+const SPEECH_LANG = {"ja":"ja-JP","en":"en-US","zh-CN":"zh-CN","es":"es-ES","pt":"pt-BR","fr":"fr-FR","de":"de-DE","ru":"ru-RU","ko":"ko-KR"};
+function toggleVoice() {
+  const btn = document.getElementById("voiceBtn");
+  if (!("speechSynthesis" in window)) { btn.textContent = "この機械では声が出ません"; return; }
+  if (window.speechSynthesis.speaking) { window.speechSynthesis.cancel(); btn.textContent = "声で聞く"; return; }
+  const aEl = document.getElementById("answerBox");
+  let text = aEl.textContent.trim();
+  if (!text) text = document.getElementById("bodyNote").textContent;
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = SPEECH_LANG[curLang] || "ja-JP";
+  u.rate = 1.0;
+  u.onend = () => { btn.textContent = "声で聞く"; };
+  u.onerror = () => { btn.textContent = "声で聞く"; };
+  btn.textContent = "止める";
+  window.speechSynthesis.speak(u);
 }
 function toggleFont() {
   const aEl = document.getElementById("answerBox");

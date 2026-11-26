@@ -307,6 +307,12 @@ function showParagraph(i) {
   src.className = "src";
   src.textContent = "出典：内蔵教科書 " + p.bookTitle + "「" + p.chapterTitle + "」";
   aEl.appendChild(src);
+  const lbtn = document.createElement("button");
+  lbtn.className = "bookBtn";
+  lbtn.textContent = "講義を聞く";
+  lbtn.onclick = () => speakLecture(i);
+  aEl.appendChild(document.createElement("br"));
+  aEl.appendChild(lbtn);
   if (aEl.scrollIntoView) aEl.scrollIntoView({behavior:"smooth", block:"start"});
 }
 function toggleBooks() {
@@ -315,6 +321,21 @@ function toggleBooks() {
   else { el.style.display = "none"; }
 }
 
+
+// ===== 講義（家庭教師として声で講義する） =====
+function speakLecture(i) {
+  const p = BUILTIN[i];
+  if (!("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined") return;
+  window.speechSynthesis.cancel();
+  let text = p.text;
+  if (curLang === "ja") {
+    text = "今日の講義は、" + p.bookTitle + "の『" + p.chapterTitle + "』です。" + p.text + " 以上です。分からないところは、質問してください。";
+  }
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = SPEECH_LANG[curLang] || "ja-JP";
+  u.rate = 1.0;
+  window.speechSynthesis.speak(u);
+}
 // ===== 読み上げ（端末の音声で答えを読む） =====
 const SPEECH_LANG = {"ja":"ja-JP","en":"en-US","zh-CN":"zh-CN","es":"es-ES","pt":"pt-BR","fr":"fr-FR","de":"de-DE","ru":"ru-RU","ko":"ko-KR"};
 function toggleVoice() {

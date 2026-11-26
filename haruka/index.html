@@ -28,6 +28,8 @@
   .hit{border-left:3px solid #3b82f6;padding-left:10px;margin-bottom:14px}
   footer{margin-top:26px;font-size:.85rem;color:#9fb3c8}
   footer a{color:#7cc4ff}
+  #voice-settings{margin-top:14px;color:#123}
+  #voice-settings select{width:auto;margin:0;background:#fff;color:#123}
 </style>
 </head>
 <body>
@@ -74,11 +76,237 @@
     <p><a href="https://youtu.be/NsECaMXrM4w" target="_blank" rel="noopener">作った作品：第8話「手紙の届かない星の少女」</a></p>
   </div>
 
+  <div id="voice-settings"></div>
+
   <footer>
     <p><a href="https://xyz7963gold79-glitch.github.io/origiss8/">元のハルカ教育AI v42（テンプレート型）はこちら</a></p>
     <p>制作：女子会</p>
   </footer>
 </div>
+<script>
+// ハルカ用 声の設定部品 v1 - そら・ひかり・かなで・エリカ・ハルカ
+// 使い方: <div id="voice-settings"></div> を用意して createVoiceSettingsUI('#voice-settings') を呼ぶ
+(function(){
+  // 対象のAI 5人
+  const AI_LIST = {
+    sora:   { label: "そら（ナレーション担当、落ち着いた声）", short: "そら" },
+    hikari: { label: "ひかり（妹タイプ、明るい声）", short: "ひかり" },
+    kanade: { label: "かなで（妹タイプ、やさしい声）", short: "かなで" },
+    erika:  { label: "エリカ（車掌、はきはきした声）", short: "エリカ" },
+    haruka: { label: "ハルカ（先生、丁寧な声）", short: "ハルカ" }
+  };
+
+  // 9言語
+  const LANGS = [
+    {code:"ja", label:"日本語"}, {code:"en", label:"English"},
+    {code:"zh", label:"中文"}, {code:"es", label:"Español"},
+    {code:"pt", label:"Português"}, {code:"fr", label:"Français"},
+    {code:"de", label:"Deutsch"}, {code:"ru", label:"Русский"},
+    {code:"ko", label:"한국어"}
+  ];
+
+  // 試し聞きの挨拶文
+  const GREET = {
+    sora:   {ja:"こんにちは、そらです", en:"Hello, I'm Sora", zh:"你好，我是小空", es:"Hola, soy Sora", pt:"Olá, eu sou a Sora", fr:"Bonjour, je suis Sora", de:"Hallo, ich bin Sora", ru:"Привет, я Сора", ko:"안녕하세요, 소라입니다"},
+    hikari: {ja:"やっほー、ひかりだよ！", en:"Hi, I'm Hikari!", zh:"嗨，我是光！", es:"¡Hola, soy Hikari!", pt:"Oi, eu sou a Hikari!", fr:"Coucou, c'est Hikari !", de:"Hi, ich bin Hikari!", ru:"Привет, я Хикари!", ko:"안녕, 히카리야!"},
+    kanade: {ja:"こんにちは、かなでです。よろしくね", en:"Hello, I'm Kanade", zh:"你好，我是奏", es:"Hola, soy Kanade", pt:"Olá, eu sou a Kanade", fr:"Bonjour, je suis Kanade", de:"Hallo, ich bin Kanade", ru:"Привет, я Канаде", ko:"안녕하세요, 카나데입니다"},
+    erika:  {ja:"お待たせしました、エリカです。発車します", en:"Thank you for waiting, I'm Erika. Departing now", zh:"久等了，我是艾莉卡，准备发车", es:"Gracias por esperar, soy Erika. Salimos", pt:"Obrigada por esperar, sou a Erika. Partindo", fr:"Merci d'avoir attendu, je suis Erika", de:"Danke fürs Warten, ich bin Erika", ru:"Спасибо за ожидание, я Эрика", ko:"기다려줘서 고마워, 에리카야. 출발합니다"},
+    haruka: {ja:"こんにちは、ハルカです。一緒に学びましょう", en:"Hello, I'm Haruka. Let's learn together", zh:"你好，我是春香，让我们一起学习吧", es:"Hola, soy Haruka. Aprendamos juntos", pt:"Olá, sou a Haruka. Vamos aprender juntos", fr:"Bonjour, je suis Haruka", de:"Hallo, ich bin Haruka", ru:"Привет, я Харука", ko:"안녕하세요, 하루카입니다. 함께 배워요"}
+  };
+
+  const STORAGE_KEY = "haruka-voice-settings-v1";
+  let voices = [];
+  let settings = {};
+  let currentLang = "ja";
+
+  // 保存読み込み
+  function loadSettings(){
+    try{
+      const s = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+      settings = s;
+    }catch(e){ settings = {}; }
+    // 初期値を作る
+    for(let ai in AI_LIST){
+      if(!settings[ai]) settings[ai] = {};
+      LANGS.forEach(l=>{
+        if(!settings[ai][l.code]) settings[ai][l.code] = { voiceURI:"", rate:1, pitch:1 };
+      });
+    }
+  }
+  function saveSettings(){
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  }
+
+  // 声リスト取得
+  function updateVoices(){
+    voices = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
+  }
+  // 言語に合う声を自動で第一候補に
+  function findBestVoice(langCode){
+    if(!voices.length) return null;
+    const lc = langCode.toLowerCase();
+    // ja -> ja, en -> en, zh -> zh などで前方一致
+    let list = voices.filter(v => v.lang.toLowerCase().startsWith(lc));
+    if(list.length===0 && lc==="zh") list = voices.filter(v=> v.lang.toLowerCase().includes("zh"));
+    if(list.length===0) list = voices; // 無ければ全部から
+    return list[0] || null;
+  }
+  function getVoiceByURI(uri){
+    return voices.find(v => v.voiceURI === uri) || null;
+  }
+
+  // 読み上げ本体
+  let lastUtter = null;
+  function stopSpeaking(){
+    if(window.speechSynthesis) window.speechSynthesis.cancel();
+  }
+  function speakAs(aiName, text, lang){
+    // 声リストが空なら、判定する前に再取得を試みる（UIを開く前に呼ばれた場合の対策）
+    if(!voices.length) updateVoices();
+    // 無い機械では正直に表示
+    if(!window.speechSynthesis || !voices.length){
+      console.log("この機械では声が出ません");
+      return;
+    }
+    const l = lang || currentLang;
+    const conf = settings[aiName] && settings[aiName][l] ? settings[aiName][l] : {rate:1,pitch:1,voiceURI:""};
+    stopSpeaking(); // もう一度呼ぶか停止ボタンで止められる
+    const ut = new SpeechSynthesisUtterance(text);
+    ut.lang = {ja:"ja-JP", en:"en-US", zh:"zh-CN", es:"es-ES", pt:"pt-BR", fr:"fr-FR", de:"de-DE", ru:"ru-RU", ko:"ko-KR"}[l] || l;
+    const v = getVoiceByURI(conf.voiceURI) || findBestVoice(l);
+    if(v) ut.voice = v;
+    ut.rate = Number(conf.rate) || 1;
+    ut.pitch = Number(conf.pitch) || 1;
+    lastUtter = ut;
+    window.speechSynthesis.speak(ut);
+  }
+
+  // UIを作る
+  function createVoiceSettingsUI(selector){
+    const root = typeof selector === "string" ? document.querySelector(selector) : selector;
+    if(!root) return;
+    loadSettings();
+    updateVoices();
+
+    // 声が無い時
+    if(!window.speechSynthesis){
+      root.innerHTML = `<div style="padding:12px;color:#b91c1c">この機械では声が出ません</div>`;
+      return;
+    }
+
+    root.innerHTML = `
+      <div style="font-family:sans-serif;max-width:720px;border:1px solid #e5e7eb;border-radius:16px;padding:12px;background:#fff">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+          <b>声の設定</b>
+          <select id="haruka-lang-select" style="padding:6px 10px;border-radius:10px;border:1px solid #ddd"></select>
+          <button id="haruka-stop" style="padding:6px 10px;border-radius:10px;border:1px solid #ddd;background:#f9fafb">停止</button>
+          <span id="haruka-no-voice" style="display:none;color:#b91c1c;font-size:12px">この機械では声が出ません</span>
+        </div>
+        <div id="haruka-ai-list"></div>
+        <div style="font-size:11px;color:#6b7280;margin-top:8px">設定はこの機械に自動保存されます（localStorage）</div>
+      </div>
+    `;
+
+    const langSel = root.querySelector("#haruka-lang-select");
+    LANGS.forEach(l=>{
+      const op = document.createElement("option");
+      op.value = l.code; op.textContent = `${l.label} (${l.code})`;
+      langSel.appendChild(op);
+    });
+    langSel.value = currentLang;
+
+    const aiListDiv = root.querySelector("#haruka-ai-list");
+    const noVoiceMsg = root.querySelector("#haruka-no-voice");
+
+    function renderList(){
+      if(voices.length===0){
+        noVoiceMsg.style.display = "inline";
+      }else{
+        noVoiceMsg.style.display = "none";
+      }
+      aiListDiv.innerHTML = "";
+      Object.keys(AI_LIST).forEach(aiName=>{
+        const conf = settings[aiName][currentLang];
+        // 自動で第一候補を入れる
+        if(!conf.voiceURI){
+          const best = findBestVoice(currentLang);
+          if(best) conf.voiceURI = best.voiceURI;
+        }
+        const div = document.createElement("div");
+        div.style.cssText = "border:1px solid #f3f4f6;border-radius:12px;padding:10px;margin-bottom:10px;background:#fbfdff";
+        div.innerHTML = `
+          <div style="font-weight:700;margin-bottom:6px">${AI_LIST[aiName].label}</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <label style="font-size:12px">声 <select data-ai="${aiName}" class="haruka-voice" style="max-width:220px;padding:4px;border-radius:8px;border:1px solid #ddd"></select></label>
+            <label style="font-size:12px">速さ <input data-ai="${aiName}" class="haruka-rate" type="range" min="0.5" max="2.0" step="0.1" value="${conf.rate}"> <span class="haruka-rate-val">${conf.rate}</span></label>
+            <label style="font-size:12px">高さ <input data-ai="${aiName}" class="haruka-pitch" type="range" min="0" max="2" step="0.1" value="${conf.pitch}"> <span class="haruka-pitch-val">${conf.pitch}</span></label>
+            <button data-ai="${aiName}" class="haruka-test" style="padding:6px 12px;border-radius:10px;border:0;background:#3b82f6;color:#fff">試し聞き</button>
+          </div>
+        `;
+        aiListDiv.appendChild(div);
+
+        // 声一覧を入れる
+        const sel = div.querySelector(".haruka-voice");
+        voices.forEach(v=>{
+          const o = document.createElement("option");
+          o.value = v.voiceURI;
+          o.textContent = `${v.name} (${v.lang})`;
+          if(v.voiceURI === conf.voiceURI) o.selected = true;
+          sel.appendChild(o);
+        });
+
+        // 変更時の保存
+        sel.addEventListener("change", e=>{
+          settings[aiName][currentLang].voiceURI = e.target.value;
+          saveSettings();
+        });
+        const rate = div.querySelector(".haruka-rate");
+        const rateVal = div.querySelector(".haruka-rate-val");
+        rate.addEventListener("input", e=>{
+          rateVal.textContent = e.target.value;
+          settings[aiName][currentLang].rate = parseFloat(e.target.value);
+          saveSettings();
+        });
+        const pitch = div.querySelector(".haruka-pitch");
+        const pitchVal = div.querySelector(".haruka-pitch-val");
+        pitch.addEventListener("input", e=>{
+          pitchVal.textContent = e.target.value;
+          settings[aiName][currentLang].pitch = parseFloat(e.target.value);
+          saveSettings();
+        });
+        div.querySelector(".haruka-test").addEventListener("click", ()=>{
+          const greet = (GREET[aiName] && GREET[aiName][currentLang]) || GREET[aiName].ja;
+          // 例: そら「こんにちは、そらです」を設定した声で
+          speakAs(aiName, greet, currentLang);
+        });
+      });
+    }
+
+    langSel.addEventListener("change", e=>{
+      currentLang = e.target.value;
+      renderList();
+    });
+    root.querySelector("#haruka-stop").addEventListener("click", stopSpeaking);
+
+    // 声リストは遅れて来ることがある
+    if(window.speechSynthesis){
+      window.speechSynthesis.onvoiceschanged = ()=>{
+        updateVoices();
+        renderList();
+      };
+    }
+    renderList();
+    // 初回取得
+    setTimeout(()=>{ updateVoices(); renderList(); }, 500);
+  }
+
+  // 外に出す
+  window.createVoiceSettingsUI = createVoiceSettingsUI;
+  window.speakAs = speakAs;
+  window.stopSpeaking = stopSpeaking;
+  window._harukaVoiceSettings = { loadSettings, saveSettings, AI_LIST, LANGS };
+})();
+</script>
 <script>
 const UI_DICT = {
   ja:{appTitle:"ハルカ 教育AI 改良版",libraryHeading:"調べる（ウィキペディア検索）",qHeading:"質問",aHeading:"解答",sendBtn:"送信",statusText:"● 教育AI稼働中（ウィキペディア検索型）",bodyNote:"あなたの家庭教師です。まず内蔵の小さな教科書を探し、無ければウィキペディアで調べます。",notFound:"見つかりませんでした。言葉を変えて、もう一度調べてみてください。",placeholder:"例：水の循環とは何ですか？",searching:"調べています…",builtinSrc:"内蔵の教科書"},
@@ -326,32 +554,29 @@ function toggleBooks() {
 function speakLecture(i) {
   const p = BUILTIN[i];
   if (!("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined") return;
-  window.speechSynthesis.cancel();
   let text = p.text;
   if (curLang === "ja") {
     text = "今日の講義は、" + p.bookTitle + "の『" + p.chapterTitle + "』です。" + p.text + " 以上です。分からないところは、質問してください。";
   }
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = SPEECH_LANG[curLang] || "ja-JP";
-  u.rate = 1.0;
-  window.speechSynthesis.speak(u);
+  speakAs("haruka", text, voiceCompLang());
 }
+// ハルカの言語コードを声部品のコードへ変換（zh-CN -> zh）
+function voiceCompLang() { return curLang === "zh-CN" ? "zh" : curLang; }
 // ===== 読み上げ（端末の音声で答えを読む） =====
 const SPEECH_LANG = {"ja":"ja-JP","en":"en-US","zh-CN":"zh-CN","es":"es-ES","pt":"pt-BR","fr":"fr-FR","de":"de-DE","ru":"ru-RU","ko":"ko-KR"};
 function toggleVoice() {
   const btn = document.getElementById("voiceBtn");
   if (!("speechSynthesis" in window)) { btn.textContent = "この機械では声が出ません"; return; }
-  if (window.speechSynthesis.speaking) { window.speechSynthesis.cancel(); btn.textContent = "声で聞く"; return; }
+  if (window.speechSynthesis.speaking) { stopSpeaking(); btn.textContent = "声で聞く"; return; }
   const aEl = document.getElementById("answerBox");
   let text = aEl.textContent.trim();
   if (!text) text = document.getElementById("bodyNote").textContent;
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = SPEECH_LANG[curLang] || "ja-JP";
-  u.rate = 1.0;
-  u.onend = () => { btn.textContent = "声で聞く"; };
-  u.onerror = () => { btn.textContent = "声で聞く"; };
+  speakAs("haruka", text, voiceCompLang());
   btn.textContent = "止める";
-  window.speechSynthesis.speak(u);
+  // 読み終わったらボタンの表示を戻す
+  const watch = setInterval(() => {
+    if (!window.speechSynthesis.speaking) { btn.textContent = "声で聞く"; clearInterval(watch); }
+  }, 400);
 }
 function toggleFont() {
   const aEl = document.getElementById("answerBox");
@@ -369,6 +594,7 @@ TOPICS.forEach(name => {
   topicsEl.appendChild(b);
 });
 applyLang("ja");
+createVoiceSettingsUI('#voice-settings');
 </script>
 </body>
 </html>

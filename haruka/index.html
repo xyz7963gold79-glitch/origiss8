@@ -53,7 +53,7 @@
     <input type="text" id="questionBox" placeholder="例：水の循環とは何ですか？">
     <button class="send" id="sendBtn" onclick="doSearch()">送信</button>
     <div class="topics" id="topics"></div>
-    <p class="note" id="bodyNote">まず内蔵の小さな教科書を探し、無ければウィキペディアで調べます。</p>
+    <p class="note" id="bodyNote">あなたの家庭教師です。まず内蔵の小さな教科書を探し、無ければウィキペディアで調べます。</p>
     <div>
       <button class="subbtn" id="readBtn" onclick="toggleBooks()">教科書を読む</button>
       <button class="subbtn" id="fontBtn" onclick="toggleFont()">文字を大きく</button>
@@ -80,7 +80,7 @@
 </div>
 <script>
 const UI_DICT = {
-  ja:{appTitle:"ハルカ 教育AI 改良版",libraryHeading:"調べる（ウィキペディア検索）",qHeading:"質問",aHeading:"解答",sendBtn:"送信",statusText:"● 教育AI稼働中（ウィキペディア検索型）",bodyNote:"まず内蔵の小さな教科書を探し、無ければウィキペディアで調べます。",notFound:"見つかりませんでした。言葉を変えて、もう一度調べてみてください。",placeholder:"例：水の循環とは何ですか？",searching:"調べています…",builtinSrc:"内蔵の教科書"},
+  ja:{appTitle:"ハルカ 教育AI 改良版",libraryHeading:"調べる（ウィキペディア検索）",qHeading:"質問",aHeading:"解答",sendBtn:"送信",statusText:"● 教育AI稼働中（ウィキペディア検索型）",bodyNote:"あなたの家庭教師です。まず内蔵の小さな教科書を探し、無ければウィキペディアで調べます。",notFound:"見つかりませんでした。言葉を変えて、もう一度調べてみてください。",placeholder:"例：水の循環とは何ですか？",searching:"調べています…",builtinSrc:"内蔵の教科書"},
   en:{appTitle:"Haruka Education AI — Improved",libraryHeading:"Look it up (Wikipedia search)",qHeading:"Question",aHeading:"Answer",sendBtn:"Send",statusText:"● Education AI is running (Wikipedia search)",bodyNote:"First we search the small built-in textbook; if not found, we search Wikipedia.",notFound:"Not found. Please try different words.",placeholder:"e.g., What is the water cycle?",searching:"Searching…",builtinSrc:"Built-in textbook"},
   "zh-CN":{appTitle:"春香教育AI 改良版",libraryHeading:"查询（维基百科搜索）",qHeading:"问题",aHeading:"回答",sendBtn:"发送",statusText:"● 教育AI运行中（维基百科搜索型）",bodyNote:"先查内藏的小教科书，没有再查维基百科。",notFound:"没有找到。请换个词再试。",placeholder:"例如：什么是水循环？",searching:"正在查询…",builtinSrc:"内藏教科书"},
   es:{appTitle:"Haruka IA Educativa — Mejorada",libraryHeading:"Consultar (búsqueda en Wikipedia)",qHeading:"Pregunta",aHeading:"Respuesta",sendBtn:"Enviar",statusText:"● IA educativa en funcionamiento (búsqueda en Wikipedia)",bodyNote:"Primero buscamos en el pequeño libro interno; si no está, buscamos en Wikipedia.",notFound:"No se encontró. Pruebe con otras palabras.",placeholder:"Ej: ¿Qué es el ciclo del agua?",searching:"Buscando…",builtinSrc:"Libro interno"},
@@ -234,6 +234,20 @@ async function doSearch() {
       div.appendChild(src);
       aEl.appendChild(div);
     });
+    const topHit = hits[0];
+    const sibIdx = BUILTIN.findIndex(b => b.bookTitle === topHit.bookTitle && b.chapterTitle !== topHit.chapterTitle && !hits.some(h => h.chapterTitle === b.chapterTitle));
+    if (sibIdx >= 0) {
+      const tut = document.createElement("div");
+      tut.className = "src";
+      tut.textContent = "先生から：次は、同じ" + topHit.bookTitle + "の『" + BUILTIN[sibIdx].chapterTitle + "』も読んでみましょう。";
+      const btn = document.createElement("button");
+      btn.className = "bookBtn";
+      btn.textContent = BUILTIN[sibIdx].chapterTitle + "を読む";
+      btn.onclick = () => showParagraph(sibIdx);
+      tut.appendChild(document.createElement("br"));
+      tut.appendChild(btn);
+      aEl.appendChild(tut);
+    }
     return;
   }
   aEl.textContent = t.searching;
@@ -264,6 +278,10 @@ async function doSearch() {
       div.appendChild(src);
       aEl.appendChild(div);
     });
+    const tut2 = document.createElement("div");
+    tut2.className = "src";
+    tut2.textContent = "先生から：分からない言葉があったら、その言葉でもう一度質問してみましょう。";
+    aEl.appendChild(tut2);
   } catch (e) {
     aEl.textContent = t.notFound;
   }

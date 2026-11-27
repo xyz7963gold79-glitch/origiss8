@@ -58,10 +58,12 @@
     <p class="note" id="bodyNote">あなたの家庭教師です。まず内蔵の小さな教科書を探し、無ければウィキペディアで調べます。</p>
     <div>
       <button class="subbtn" id="readBtn" onclick="toggleBooks()">教科書を読む</button>
+      <button class="subbtn" id="fieldBtn" onclick="toggleFields()">高等教育への入口</button>
       <button class="subbtn" id="fontBtn" onclick="toggleFont()">文字を大きく</button>
       <button class="subbtn" id="voiceBtn" onclick="toggleVoice()">声で聞く</button>
     </div>
     <div id="bookList" style="display:none"></div>
+    <div id="fieldList" style="display:none"></div>
   </div>
 
   <div class="card">
@@ -705,6 +707,75 @@ function toggleBooks() {
   if (el.style.display === "none") { renderBooks(); el.style.display = "block"; }
   else { el.style.display = "none"; }
 }
+
+// ===== 高等教育への入口（第51号：学問分野の案内、メタAI作） =====
+var HARUKA_FIELDS = [
+  { name: "数学", desc: "数と形の決まりを見つけ問題を解く学問", keywords: ["数学", "算数", "関数"] },
+  { name: "物理学", desc: "物の動きや力や光の仕組みを調べる学問", keywords: ["物理学", "力", "エネルギー"] },
+  { name: "化学", desc: "物の成分や変化を調べ暮らしに生かす学問", keywords: ["化学", "元素", "化学反応"] },
+  { name: "生物学", desc: "生き物の体と暮らしとつながりを調べる学問", keywords: ["生物学", "細胞", "生態系"] },
+  { name: "地学", desc: "地球や空や海の成り立ちを調べる学問", keywords: ["地学", "地震", "天気"] },
+  { name: "医学", desc: "人の体と病気を理解し治し方を学ぶ学問", keywords: ["医学", "人体", "病気"] },
+  { name: "薬学", desc: "薬が体にどう働くかを調べ作り方を学ぶ学問", keywords: ["薬学", "薬", "副作用"] },
+  { name: "看護学", desc: "病気や怪我の人を支える看護を学ぶ学問", keywords: ["看護学", "看護師", "ケア"] },
+  { name: "工学", desc: "役に立つ物や仕組みを設計して作る学問", keywords: ["工学", "設計", "ものづくり"] },
+  { name: "情報科学", desc: "コンピュータとデータの仕組みを学ぶ学問", keywords: ["情報科学", "プログラミング", "人工知能"] },
+  { name: "農学", desc: "食べ物を作り自然と共に暮らす方法を学ぶ学問", keywords: ["農学", "農業", "作物"] },
+  { name: "経済学", desc: "お金と物の動きや社会の仕組みを考える学問", keywords: ["経済学", "経済", "市場"] },
+  { name: "経営学", desc: "会社や店をうまく動かす方法を学ぶ学問", keywords: ["経営学", "会社", "マーケティング"] },
+  { name: "法学", desc: "決まりを作り争いを公平に解決する方法を学ぶ", keywords: ["法学", "法律", "憲法"] },
+  { name: "政治学", desc: "社会をどう治め皆で決めるかを考える学問", keywords: ["政治学", "政治", "選挙"] },
+  { name: "文学", desc: "物語や詩を読み人の心と文化を味わう学問", keywords: ["文学", "小説", "詩"] },
+  { name: "歴史学", desc: "昔の出来事を調べて今につなげて考える学問", keywords: ["歴史学", "歴史", "考古学"] },
+  { name: "哲学", desc: "生きるとは何かを問い深く考える学問", keywords: ["哲学", "倫理", "考え方"] },
+  { name: "心理学", desc: "人の心と行動の仕組みを調べる学問", keywords: ["心理学", "心", "ストレス"] },
+  { name: "教育学", desc: "教える事と学ぶ事の方法を考える学問", keywords: ["教育学", "教育", "学校"] },
+  { name: "社会学", desc: "人と社会のつながりと変化を調べる学問", keywords: ["社会学", "社会", "家族"] },
+  { name: "芸術", desc: "絵や音楽で心を表し世界と対話する学問", keywords: ["芸術", "美術", "音楽"] },
+  { name: "調理", desc: "食材を生かし安全でおいしい料理を作る技術", keywords: ["調理", "料理", "栄養"] },
+  { name: "製菓", desc: "お菓子やパンを作り喜びを届ける技術", keywords: ["製菓", "お菓子", "パン"] },
+  { name: "建築", desc: "人が安心して暮らす建物を設計し建てる技術", keywords: ["建築", "設計図", "住宅"] },
+  { name: "土木", desc: "道路や橋を作り暮らしを支える技術", keywords: ["土木", "道路", "橋"] },
+  { name: "自動車整備", desc: "車の仕組みを知り安全に動くよう整える技術", keywords: ["自動車整備", "自動車", "エンジン"] },
+  { name: "電気工事", desc: "電気を安全に届け設備を整える技術", keywords: ["電気工事", "電気", "配線"] },
+  { name: "美容", desc: "髪や肌を整え人を美しく元気にする技術", keywords: ["美容", "美容師", "ヘアスタイル"] },
+  { name: "服飾", desc: "服を作り着る人の暮らしと文化を彩る技術", keywords: ["服飾", "ファッション", "縫製"] },
+  { name: "デザイン", desc: "使いやすく美しい形と伝え方を考える技術", keywords: ["デザイン", "グラフィックデザイン", "プロダクトデザイン"] },
+  { name: "福祉", desc: "困っている人を支え共に暮らす社会を作る仕事", keywords: ["福祉", "介護", "社会福祉"] },
+  { name: "保育", desc: "小さな子供の育ちと暮らしを支える仕事", keywords: ["保育", "保育士", "幼稚園"] },
+  { name: "農業技術", desc: "作物を育て収穫する技を身につける仕事", keywords: ["農業技術", "野菜", "稲作"] },
+  { name: "観光", desc: "旅の魅力を伝え地域と人をつなぐ仕事", keywords: ["観光", "旅行", "ガイド"] }
+];
+
+function fieldSearch(kw) {
+  const box = document.getElementById("questionBox");
+  box.value = (curLang === "ja") ? kw + "とは何ですか？" : kw;
+  doSearch();
+}
+function renderFields() {
+  const el = document.getElementById("fieldList");
+  const groups = [
+    { title: "大学・大学院の分野", items: HARUKA_FIELDS.slice(0, 22) },
+    { title: "専門学校・職業の分野", items: HARUKA_FIELDS.slice(22) }
+  ];
+  el.innerHTML = groups.map(g =>
+    "<h3>" + g.title + "</h3>" + g.items.map(f =>
+      '<div style="margin:8px 0"><b>' + f.name + "</b> ― " + f.desc +
+      '<div class="topics">' + f.keywords.map(kw => '<button data-kw="' + kw + '">' + kw + "</button>").join("") + "</div></div>"
+    ).join("")
+  ).join("");
+}
+function toggleFields() {
+  const el = document.getElementById("fieldList");
+  if (el.style.display === "none") { renderFields(); el.style.display = "block"; }
+  else { el.style.display = "none"; }
+}
+window.fieldSearch = fieldSearch;
+window.toggleFields = toggleFields;
+document.getElementById("fieldList").addEventListener("click", function(e) {
+  const b = e.target.closest("button[data-kw]");
+  if (b) fieldSearch(b.getAttribute("data-kw"));
+});
 
 
 // ===== 講義（家庭教師として声で講義する。第50号の講義部品で順番に読む） =====

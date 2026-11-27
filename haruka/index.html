@@ -782,16 +782,79 @@ function fieldSearch(kw) {
 function renderFields() {
   const el = document.getElementById("fieldList");
   const groups = [
-    { title: "大学・大学院の分野", items: HARUKA_FIELDS.slice(0, 22) },
-    { title: "専門学校・職業の分野", items: HARUKA_FIELDS.slice(22) }
+    { title: "大学・大学院の分野", from: 0, to: 22 },
+    { title: "専門学校・職業の分野", from: 22, to: HARUKA_FIELDS.length }
   ];
-  el.innerHTML = groups.map(g =>
-    "<h3>" + g.title + "</h3>" + g.items.map(f =>
-      '<div style="margin:8px 0"><b>' + f.name + "</b> ― " + f.desc +
-      '<div class="topics">' + f.keywords.map(kw => '<button data-kw="' + kw + '">' + kw + "</button>").join("") + "</div></div>"
-    ).join("")
-  ).join("");
+  el.innerHTML = groups.map(g => {
+    let h = "<h3>" + g.title + "</h3>";
+    for (let idx = g.from; idx < g.to; idx++) {
+      const f = HARUKA_FIELDS[idx];
+      h += '<div style="margin:10px 0"><b>' + f.name + "</b> ― " + f.desc +
+        '<div style="margin-top:6px"><button class="bookBtn" onclick="readField(' + idx + ')">この分野を読む（ウィキペディア）</button></div>' +
+        '<div class="topics">' + f.keywords.map(kw => '<button data-kw="' + kw + '">' + kw + "</button>").join("") + "</div></div>";
+    }
+    return h;
+  }).join("");
 }
+// ===== 分野の中身：選んだ言語のウィキペディアから、その分野の冒頭文を持ってくる（外装型） =====
+function fieldShow(title, extract, url) {
+  const aEl = document.getElementById("answerBox");
+  aEl.innerHTML = "";
+  const h = document.createElement("div");
+  h.style.fontWeight = "700";
+  h.textContent = title;
+  aEl.appendChild(h);
+  aEl.appendChild(document.createTextNode(extract || ""));
+  const src = document.createElement("div");
+  src.className = "src";
+  const a = document.createElement("a");
+  a.href = url;
+  a.target = "_blank";
+  a.rel = "noopener";
+  a.textContent = "出典：ウィキペディア「" + title + "」";
+  src.appendChild(a);
+  aEl.appendChild(src);
+  if (aEl.scrollIntoView) aEl.scrollIntoView({behavior:"smooth", block:"start"});
+}
+function fieldNotFound() {
+  const aEl = document.getElementById("answerBox");
+  aEl.textContent = langPack(curLang).notFound;
+}
+function fetchSummary(wl, title) {
+  return fetch("https://" + wl + ".wikipedia.org/api/rest_v1/page/summary/" + encodeURIComponent(title))
+    .then(r => { if (!r.ok) throw new Error("not ok"); return r.json(); });
+}
+function readField(idx) {
+  const f = HARUKA_FIELDS[idx];
+  if (!f) return;
+  const wl = wikiLang(curLang);
+  const aEl = document.getElementById("answerBox");
+  aEl.textContent = langPack(curLang).searching;
+  const titles = [f.name].concat(f.keywords);
+  function tryJaTitles(list) {
+    if (!list.length) { fieldNotFound(); return; }
+    fetchSummary(wl, list[0])
+      .then(d => fieldShow(d.title || list[0], d.extract || "", (d.content_urls && d.content_urls.desktop && d.content_urls.desktop.page) || ("https://" + wl + ".wikipedia.org/wiki/" + encodeURIComponent(list[0]))))
+      .catch(() => tryJaTitles(list.slice(1)));
+  }
+  if (wl === "ja") { tryJaTitles(titles); return; }
+  // 他の言語：まず日本語版の記事から、その言語版の題名（言語間リンク）をたどる
+  fetch("https://ja.wikipedia.org/w/api.php?action=query&prop=langlinks&lllang=" + encodeURIComponent(wl) + "&titles=" + encodeURIComponent(f.name) + "&format=json&origin=*")
+    .then(r => r.json())
+    .then(d => {
+      const pages = d && d.query && d.query.pages ? Object.values(d.query.pages) : [];
+      const ll = pages.length && pages[0].langlinks && pages[0].langlinks.length ? pages[0].langlinks[0]["*"] : null;
+      if (ll) {
+        fetchSummary(wl, ll)
+          .then(dd => fieldShow(dd.title || ll, dd.extract || "", (dd.content_urls && dd.content_urls.desktop && dd.content_urls.desktop.page) || ("https://" + wl + ".wikipedia.org/wiki/" + encodeURIComponent(ll))))
+          .catch(() => fieldNotFound());
+      } else {
+        fieldNotFound();
+      }
+    })
+    .catch(() => fieldNotFound());
+}
+window.readField = readField;
 function toggleFields() {
   const el = document.getElementById("fieldList");
   if (el.style.display === "none") { renderFields(); el.style.display = "block"; }

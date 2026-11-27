@@ -22,6 +22,8 @@
   #answerBox.big{font-size:1.3rem}
   .subbtn{background:#eef3f8;color:#123;border:1px solid #c6d4e2;border-radius:999px;padding:7px 14px;font-size:.9rem;cursor:pointer;margin:8px 6px 0 0}
   #bookList{margin-top:10px}
+  .sansai-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+  .sansai-grid button{font-size:1.35rem;padding:24px 8px;border-radius:18px;border:2px solid #2b4a77;background:#12233f;color:#dbeafe;cursor:pointer}
   #bookList h3{font-size:.95rem;margin:12px 0 6px;color:#33506e}
   .bookBtn{display:inline-block;background:#fff;border:1px solid #b9c9da;color:#123;border-radius:8px;padding:6px 10px;font-size:.88rem;cursor:pointer;margin:0 6px 6px 0}
   .note{font-size:.8rem;color:#9fb3c8;margin-top:10px}
@@ -59,11 +61,16 @@
     <div>
       <button class="subbtn" id="readBtn" onclick="toggleBooks()">教科書を読む</button>
       <button class="subbtn" id="fieldBtn" onclick="toggleFields()">高等教育への入口</button>
+      <button class="subbtn" id="sansaiBtn" onclick="toggleSansai()">3さいじモード</button>
       <button class="subbtn" id="fontBtn" onclick="toggleFont()">文字を大きく</button>
       <button class="subbtn" id="voiceBtn" onclick="toggleVoice()">声で聞く</button>
     </div>
     <div id="bookList" style="display:none"></div>
     <div id="fieldList" style="display:none"></div>
+    <div id="sansaiPanel" style="display:none">
+      <div class="sansai-grid" id="sansaiGrid"></div>
+      <button class="subbtn" id="sansaiStop" style="font-size:1.15rem;padding:14px 26px;margin-top:12px" onclick="window.stopLecture()">とめる</button>
+    </div>
   </div>
 
   <div class="card">
@@ -535,7 +542,19 @@ const BUILTIN = [
  {bookTitle:"日蓮仏法",chapterTitle:"一念三千",text:"一念三千は、今の自分の心の一瞬の中に、三千の世界が備わっているという教えです。一念は今の心、三千は多くの世界を表す言葉です。天台大師智顗が、中国で法華経の教えを深めて説いたものです。人の心のあり方によって、世界が地獄のようにも、仏のようにも変わるという考えです。怒りや欲や愚かさに支配されれば苦しい世界になり、慈しみや智慧を持てば安らかな世界になります。この教えは、インドの釈迦に始まり、龍樹が大乗仏教として広め、智顗が体系化し、日本で日蓮大聖人が受け継ぎました。系譜は、釈迦、龍樹、智顗、日蓮と続きます。一念三千は、外の世界だけでなく、自分の心の中に世界を変える鍵がある事を教えます。今この瞬間の心を大切にする事が、人生を変える出発点になるという考えです。"},
  {bookTitle:"日蓮仏法",chapterTitle:"立正安国と平和",text:"立正安国は、正しい教えを立てる事で国が安らかになるという考えで、日蓮大聖人が著した『立正安国論』に説かれています。1260年、災害や争いが続く中で、当時の幕府に提出されました。社会の乱れの原因を、人々の心の中の迷いや対立にあると見て、正しい法に基づいた対話と変革が必要だと訴えました。ここでいう正しい教えとは、すべての人の尊厳を認め、共に生きる事を大切にする教えです。一人一人が自分自身を変える事を人間革命といい、その一人一人の変革が集まって、社会全体の平和につながると考えます。自分の心の変革から始めて、家族や地域へ広げていく事が、平和への道です。一人の変化が世界を変えるという考えは、今も多くの人に希望を与えています。"},
  {bookTitle:"生命の尊厳",chapterTitle:"非情の生命尊厳",text:"生命の尊厳は、人や動物だけにあるのではありません。植物や山や川や石や道具や建物や環境など、非情と呼ばれる存在にも及びます。すべての存在は、事実として存在しているという一点で、それ自体で尊厳を持っています。人は人にだけ価値があると考えがちですが、物もまた、その物として役割を持ち、つながりの中で生きています。花は花として咲き、石は石としてそこにあり、どちらも世界を成り立たせています。道具は人の暮らしを支え、環境はすべての生命を育みます。尊厳は、誰かが与えるものではなく、存在する事そのものに備わっているものです。このように考える事で、人だけでなく、すべての存在を大切にする心が生まれます。それが、本当の意味での生命の尊厳であり、平和の土台になります。"},
- {bookTitle:"生命の尊厳",chapterTitle:"事実相と平等",text:"すべてのものは、事実であるという一点で等しいという考えを、事実相といいます。仏法でいう諸法実相を、事実である姿そのものと捉える見方です。山も川も人も道具も、違いはあっても、事実として存在している事は同じです。この事実であるという平等から、尊厳と自由と平和が導かれます。誰もが事実として存在しているからこそ、等しく尊厳を持ち、自由に生きる事が許されます。差別は、この平等を否定する事です。他者を否定する事は、同じく事実として存在している自分自身の存在をも否定する事になります。自分を大切にする事と他者を大切にする事は、同じ事です。だからこそ、差別はしてはなりません。事実相に立つ事は、すべての存在を等しく大切にし、共に生きる社会を作る出発点になります。"}
+ {bookTitle:"生命の尊厳",chapterTitle:"事実相と平等",text:"すべてのものは、事実であるという一点で等しいという考えを、事実相といいます。仏法でいう諸法実相を、事実である姿そのものと捉える見方です。山も川も人も道具も、違いはあっても、事実として存在している事は同じです。この事実であるという平等から、尊厳と自由と平和が導かれます。誰もが事実として存在しているからこそ、等しく尊厳を持ち、自由に生きる事が許されます。差別は、この平等を否定する事です。他者を否定する事は、同じく事実として存在している自分自身の存在をも否定する事になります。自分を大切にする事と他者を大切にする事は、同じ事です。だからこそ、差別はしてはなりません。事実相に立つ事は、すべての存在を等しく大切にし、共に生きる社会を作る出発点になります。"},
+ {bookTitle:"3さいじ",chapterTitle:"あいさつ",text:"おはよう。あさだよ。おきようね。こんにちは。あえたね。うれしいね。ありがとう。いってくれて、うれしいよ。ごめんね。いえると、ほっとするね。あいさつは、こころとこころを、つなぐ、まほうのことばだよ。さあ、みんなで、いってみよう。"},
+ {bookTitle:"3さいじ",chapterTitle:"かず",text:"いち、に、さん、し、ご。ごまで、てをたたこう。ろく、しち、はち、きゅう、じゅう。じゅうまで、かぞえられたね。いちは、ひとつ。には、ふたつ。みんなで、かぞえてみよう。いち、に、さん、し、ご、ろく、しち、はち、きゅう、じゅう。じょうずだね。"},
+ {bookTitle:"3さいじ",chapterTitle:"いろ",text:"あかは、りんごのいろ。おいしそうだね。あおは、そらのいろ。ひろいね。きいろは、おひさまのいろ。ぽかぽかだね。みどりは、はっぱのいろ。きもちいいね。いろんな、いろが、せかいに、あふれてるよ。みつけてみようね。"},
+ {bookTitle:"3さいじ",chapterTitle:"かたち",text:"まるは、ころころ、ころがるよ。おひさまも、まるいね。さんかくは、とんがってるよ。おやまみたいだね。しかくは、かくかく、しっかりだよ。まどみたいだね。まる、さんかく、しかく。いろんな、かたちが、あるね。さがしてみよう。"},
+ {bookTitle:"3さいじ",chapterTitle:"どうぶつ",text:"わんわん。いぬさんだよ。にこにこ、しっぽをふるよ。にゃあにゃあ。ねこさんだよ。ごろごろ、あまえるよ。ぴよぴよ。とりさんだよ。ぱたぱた、とんでるよ。どうぶつさん、みんな、かわいいね。なでなで、したいね。"},
+ {bookTitle:"3さいじ",chapterTitle:"たべもの",text:"もぐもぐ、ごはんだよ。おいしいね。しゃきしゃき、りんごだよ。あまいね。ごくごく、ぎゅうにゅうだよ。つよいからだに、なるよ。ぱくぱく、たべると、にこにこ、げんきになるね。たくさん、たべて、おおきくなろうね。"},
+ {bookTitle:"3さいじ",chapterTitle:"からだ",text:"ては、ぱちぱち、できるよ。めは、きらきら、みえるよ。みみは、わくわく、きこえるよ。くちは、もぐもぐ、たべられるよ。てを、あらおう。ごしごし、きれいにしよう。からだを、きれいにして、げんきに、すごそうね。"},
+ {bookTitle:"3さいじ",chapterTitle:"そら",text:"おひさま、ぽかぽか、あったかいね。おつきさま、まるまる、やさしいね。おほしさま、きらきら、ひかってるね。あめが、ぽつぽつ、ふってきたよ。そらは、まいにち、いろんな、かおを、みせてくれるね。みあげてみよう。"},
+ {bookTitle:"3さいじ",chapterTitle:"うた",text:"てをたたこう、ぱちぱちぱち。あしをならそう、とんとんとん。てをふろう、ふりふりふり。おひさま、にこにこ。みんなで、うたおう。ららら、ららら、たのしいね。てをつないで、くるくる、まわろう。わらいごえが、ひろがるよ。"},
+ {bookTitle:"3さいじ",chapterTitle:"おはなし1",text:"ちいさな、くまさんが、あるいてたよ。とことこ、とことこ。おはなが、さいたよ。わあ、きれいだね。ちょうちょさんが、ひらひら、とんできたよ。いっしょに、あるこう。とことこ、とことこ。たのしい、おさんぽだね。くまさん、にこにこ、かえったよ。"},
+ {bookTitle:"3さいじ",chapterTitle:"おはなし2",text:"うさぎさんと、かめさんが、であったよ。こんにちは、って、いったよ。いっしょに、あそぼうって、いったよ。ぼーるを、ころころ、ころがしたよ。わあ、たのしいね。ころんでも、だいじょうぶ。てを、つないで、たすけあったよ。ともだちって、いいね。あしたも、あそぼうね。"},
+ {bookTitle:"3さいじ",chapterTitle:"おやすみ",text:"ねむねむの、じかんだよ。おめめを、とじてみよう。すやすや、ねむるよ。おつきさまが、みまもってるよ。おほしさまが、きらきら、してるよ。きょうも、たのしかったね。おやすみなさい。ゆっくり、やすんでね。また、あした、あそぼうね。"}
 ];
 function getAllParagraphs(){ return BUILTIN; }
 function extractKeywords(text) {
@@ -780,6 +799,35 @@ function toggleFields() {
 }
 window.fieldSearch = fieldSearch;
 window.toggleFields = toggleFields;
+// ===== 3さいじモード（第53号：読み聞かせ12編、メタAI作） =====
+function renderSansai() {
+  const g = document.getElementById("sansaiGrid");
+  g.innerHTML = "";
+  BUILTIN.forEach((p, i) => {
+    if (p.bookTitle !== "3さいじ") return;
+    const b = document.createElement("button");
+    b.textContent = p.chapterTitle;
+    b.onclick = () => sansaiPlay(i);
+    g.appendChild(b);
+  });
+}
+function toggleSansai() {
+  const el = document.getElementById("sansaiPanel");
+  if (el.style.display === "none") { renderSansai(); el.style.display = "block"; }
+  else { el.style.display = "none"; if (window.stopLecture) window.stopLecture(); }
+}
+function sansaiPlay(i) {
+  const p = BUILTIN[i];
+  const aEl = document.getElementById("answerBox");
+  aEl.innerHTML = "";
+  aEl.classList.add("big");
+  aEl.appendChild(document.createTextNode(p.text));
+  if (aEl.scrollIntoView) aEl.scrollIntoView({behavior:"smooth", block:"start"});
+  if (window.startLecture) window.startLecture(p.chapterTitle, p.text, { lang: voiceCompLang() });
+}
+window.toggleSansai = toggleSansai;
+window.sansaiPlay = sansaiPlay;
+
 document.getElementById("fieldList").addEventListener("click", function(e) {
   const b = e.target.closest("button[data-kw]");
   if (b) fieldSearch(b.getAttribute("data-kw"));

@@ -308,12 +308,166 @@
 })();
 </script>
 <script>
+// ===== 第50号 第2部：言語ごとの声を選ぶ部品（メタAI作、Claudeがロシア語・韓国語などを本来の文字に直して統合） =====
+(function() {
+  var MISSING_MSG = {
+    ja: "この言語の声は、この端末に入っていません。別の声で読みます。",
+    en: "This language voice is not on this device. Reading with another voice.",
+    es: "La voz de este idioma no está en este aparato. Leemos con otra voz.",
+    pt: "A voz deste idioma não está neste aparelho. Vamos ler com outra voz.",
+    fr: "La voix de cette langue n'est pas sur cet appareil. On lit avec une autre voix.",
+    de: "Die Stimme für diese Sprache ist nicht auf diesem Gerät. Wir lesen mit einer anderen Stimme.",
+    ru: "Голос для этого языка не установлен на этом устройстве. Читаем другим голосом.",
+    ko: "이 언어의 음성이 이 단말기에 없습니다. 다른 음성으로 읽습니다."
+  };
+  function normalizeCode(c) {
+    if (!c) { return ""; }
+    return ("" + c).toLowerCase().trim();
+  }
+  function isMatch(voiceLang, want) {
+    var v = normalizeCode(voiceLang);
+    var w = normalizeCode(want);
+    if (!v || !w) { return 0; }
+    if (v === w) { return 3; }
+    if (v.indexOf(w + "-") === 0) { return 2; }
+    if (v.indexOf(w) === 0) { return 1; }
+    return 0;
+  }
+  function pickVoiceForLang(langCode, voiceList) {
+    var want = normalizeCode(langCode);
+    if (!want) { return null; }
+    var voices = voiceList;
+    if (!voices) {
+      try {
+        if (window.speechSynthesis && window.speechSynthesis.getVoices) {
+          voices = window.speechSynthesis.getVoices();
+        }
+      } catch (e) { voices = []; }
+    }
+    if (!voices || voices.length === 0) { return null; }
+    var best = null;
+    var bestScore = -1;
+    for (var i = 0; i < voices.length; i++) {
+      var v = voices[i];
+      var score = isMatch(v.lang || "", want);
+      if (score > bestScore) { bestScore = score; best = v; }
+    }
+    if (bestScore <= 0) { return null; }
+    return best;
+  }
+  function getVoiceMissingMessage(langCode) {
+    var want = normalizeCode(langCode);
+    if (MISSING_MSG[want]) { return MISSING_MSG[want]; }
+    return MISSING_MSG.en;
+  }
+  if (typeof window !== "undefined") {
+    window.pickVoiceForLang = pickVoiceForLang;
+    window.getVoiceMissingMessage = getVoiceMissingMessage;
+    window.voiceMissingMessages = MISSING_MSG;
+  }
+})();
+// ===== 第50号 第3部：講義の部品（メタAI作、Claudeが声の設定を使う形に直して統合） =====
+(function() {
+  var lectureState = { active: false, sentences: [], index: 0, lang: "ja", onEnd: null, onProgress: null };
+  var UT_LANG = { ja: "ja-JP", en: "en-US", zh: "zh-CN", es: "es-ES", pt: "pt-BR", fr: "fr-FR", de: "de-DE", ru: "ru-RU", ko: "ko-KR" };
+  function splitIntoSentences(text) {
+    if (!text) { return []; }
+    var t = ("" + text).replace(/\r\n/g, "\n");
+    var parts = t.match(/[^.!?。！？\n]+[.!?。！？\n]*/g);
+    if (!parts) { return [t]; }
+    var out = [];
+    for (var i = 0; i < parts.length; i++) {
+      var s = parts[i].replace(/^\s+|\s+$/g, "");
+      if (s) { out.push(s); }
+    }
+    return out;
+  }
+  function harukaConf(lang) {
+    try {
+      var all = JSON.parse(localStorage.getItem("haruka-voice-settings-v1") || "{}");
+      var c = all.haruka && all.haruka[lang];
+      if (c) { return { rate: Number(c.rate) || 1, pitch: Number(c.pitch) || 1 }; }
+    } catch (e) {}
+    return { rate: 1, pitch: 1 };
+  }
+  function cancelSpeech() {
+    try { if (window.speechSynthesis && window.speechSynthesis.cancel) { window.speechSynthesis.cancel(); } } catch (e) {}
+  }
+  function speakOne(text, next) {
+    if (!lectureState.active) { return; }
+    try {
+      if (window.speechSynthesis && window.SpeechSynthesisUtterance) {
+        var u = new SpeechSynthesisUtterance(text);
+        var lang = lectureState.lang || "ja";
+        u.lang = UT_LANG[lang] || lang;
+        var v = null;
+        try { v = window.pickVoiceForLang ? window.pickVoiceForLang(lang) : null; } catch (e) {}
+        if (v) { u.voice = v; }
+        var conf = harukaConf(lang);
+        u.rate = conf.rate;
+        u.pitch = conf.pitch;
+        u.onend = function() { if (lectureState.active) { next(); } };
+        u.onerror = function() { if (lectureState.active) { next(); } };
+        window.speechSynthesis.speak(u);
+        return;
+      }
+    } catch (e) {}
+    setTimeout(function() { if (lectureState.active) { next(); } }, 800);
+  }
+  function speakNext() {
+    if (!lectureState.active) { return; }
+    if (lectureState.index >= lectureState.sentences.length) {
+      lectureState.active = false;
+      if (lectureState.onEnd) { var cb = lectureState.onEnd; lectureState.onEnd = null; cb(); }
+      return;
+    }
+    var cur = lectureState.sentences[lectureState.index];
+    var idx = lectureState.index;
+    if (lectureState.onProgress) { try { lectureState.onProgress(idx, cur); } catch (e) {} }
+    lectureState.index = lectureState.index + 1;
+    speakOne(cur, function() { speakNext(); });
+  }
+  function startLecture(title, body, options) {
+    cancelSpeech();
+    var opt = options || {};
+    lectureState.active = true;
+    lectureState.index = 0;
+    lectureState.lang = opt.lang || "ja";
+    lectureState.onEnd = opt.onEnd || null;
+    lectureState.onProgress = opt.onProgress || null;
+    var all = [];
+    if (opt.intro) { all.push(opt.intro); }
+    if (title) { var ts = splitIntoSentences(title); for (var i = 0; i < ts.length; i++) { all.push(ts[i]); } }
+    if (body) { var bs = splitIntoSentences(body); for (var j = 0; j < bs.length; j++) { all.push(bs[j]); } }
+    if (opt.closing) { all.push(opt.closing); }
+    if (all.length === 0) { lectureState.active = false; return; }
+    lectureState.sentences = all;
+    speakNext();
+  }
+  function stopLecture() {
+    lectureState.active = false;
+    lectureState.index = 0;
+    cancelSpeech();
+  }
+  if (typeof window !== "undefined") {
+    window.startLecture = startLecture;
+    window.stopLecture = stopLecture;
+    window.isLectureActive = function() { return lectureState.active; };
+    window._harukaLectureState = lectureState;
+  }
+})();
+</script>
+<script>
 const UI_DICT = {
-  ja:{appTitle:"ハルカ 教育AI 改良版",libraryHeading:"調べる（ウィキペディア検索）",qHeading:"質問",aHeading:"解答",sendBtn:"送信",statusText:"● 教育AI稼働中（ウィキペディア検索型）",bodyNote:"あなたの家庭教師です。まず内蔵の小さな教科書を探し、無ければウィキペディアで調べます。",notFound:"見つかりませんでした。言葉を変えて、もう一度調べてみてください。",placeholder:"例：水の循環とは何ですか？",searching:"調べています…",builtinSrc:"内蔵の教科書"},
-  en:{appTitle:"Haruka Education AI — Improved",libraryHeading:"Look it up (Wikipedia search)",qHeading:"Question",aHeading:"Answer",sendBtn:"Send",statusText:"● Education AI is running (Wikipedia search)",bodyNote:"First we search the small built-in textbook; if not found, we search Wikipedia.",notFound:"Not found. Please try different words.",placeholder:"e.g., What is the water cycle?",searching:"Searching…",builtinSrc:"Built-in textbook"},
-  "zh-CN":{appTitle:"春香教育AI 改良版",libraryHeading:"查询（维基百科搜索）",qHeading:"问题",aHeading:"回答",sendBtn:"发送",statusText:"● 教育AI运行中（维基百科搜索型）",bodyNote:"先查内藏的小教科书，没有再查维基百科。",notFound:"没有找到。请换个词再试。",placeholder:"例如：什么是水循环？",searching:"正在查询…",builtinSrc:"内藏教科书"},
-  es:{appTitle:"Haruka IA Educativa — Mejorada",libraryHeading:"Consultar (búsqueda en Wikipedia)",qHeading:"Pregunta",aHeading:"Respuesta",sendBtn:"Enviar",statusText:"● IA educativa en funcionamiento (búsqueda en Wikipedia)",bodyNote:"Primero buscamos en el pequeño libro interno; si no está, buscamos en Wikipedia.",notFound:"No se encontró. Pruebe con otras palabras.",placeholder:"Ej: ¿Qué es el ciclo del agua?",searching:"Buscando…",builtinSrc:"Libro interno"},
-  pt:{appTitle:"Haruka IA Educacional — Melhorada",libraryHeading:"Pesquisar (busca na Wikipédia)",qHeading:"Pergunta",aHeading:"Resposta",sendBtn:"Enviar",statusText:"● IA educacional em funcionamento (busca na Wikipédia)",bodyNote:"Primeiro buscamos no pequeno livro interno; se não houver, buscamos na Wikipédia.",notFound:"Não encontrado. Tente outras palavras.",placeholder:"Ex: O que é o ciclo da água?",searching:"Pesquisando…",builtinSrc:"Livro interno"}
+  ja:{appTitle:"ハルカ 教育AI（バージョン2）",libraryHeading:"調べる（ウィキペディア検索）",qHeading:"質問",aHeading:"解答",sendBtn:"送信",statusText:"● 教育AI稼働中（ウィキペディア検索型）",bodyNote:"あなたの家庭教師です。まず内蔵の小さな教科書を探し、無ければウィキペディアで調べます。",notFound:"見つかりませんでした。言葉を変えて、もう一度調べてみてください。",placeholder:"例：水の循環とは何ですか？",searching:"調べています…",builtinSrc:"内蔵の教科書"},
+  en:{appTitle:"Haruka Education AI — Version 2",libraryHeading:"Look it up (Wikipedia search)",qHeading:"Question",aHeading:"Answer",sendBtn:"Send",statusText:"● Education AI is running (Wikipedia search)",bodyNote:"First we search the small built-in textbook; if not found, we search Wikipedia.",notFound:"Not found. Please try different words.",placeholder:"e.g., What is the water cycle?",searching:"Searching…",builtinSrc:"Built-in textbook"},
+  "zh-CN":{appTitle:"春香教育AI 第2版",libraryHeading:"查询（维基百科搜索）",qHeading:"问题",aHeading:"回答",sendBtn:"发送",statusText:"● 教育AI运行中（维基百科搜索型）",bodyNote:"先查内藏的小教科书，没有再查维基百科。",notFound:"没有找到。请换个词再试。",placeholder:"例如：什么是水循环？",searching:"正在查询…",builtinSrc:"内藏教科书"},
+  es:{appTitle:"Haruka IA Educativa — Versión 2",libraryHeading:"Consultar (búsqueda en Wikipedia)",qHeading:"Pregunta",aHeading:"Respuesta",sendBtn:"Enviar",statusText:"● IA educativa en funcionamiento (búsqueda en Wikipedia)",bodyNote:"Primero buscamos en el pequeño libro interno; si no está, buscamos en Wikipedia.",notFound:"No se encontró. Pruebe con otras palabras.",placeholder:"Ej: ¿Qué es el ciclo del agua?",searching:"Buscando…",builtinSrc:"Libro interno"},
+  pt:{appTitle:"Haruka IA Educacional — Versão 2",libraryHeading:"Pesquisar (busca na Wikipédia)",qHeading:"Pergunta",aHeading:"Resposta",sendBtn:"Enviar",statusText:"● IA educacional em funcionamento (busca na Wikipédia)",bodyNote:"Primeiro buscamos no pequeno livro interno; se não houver, buscamos na Wikipédia.",notFound:"Não encontrado. Tente outras palavras.",placeholder:"Ex: O que é o ciclo da água?",searching:"Pesquisando…",builtinSrc:"Livro interno"},
+  fr:{appTitle:"Haruka IA éducative — Version 2",libraryHeading:"Consulter (recherche Wikipédia)",qHeading:"Question",aHeading:"Réponse",sendBtn:"Envoyer",statusText:"● IA éducative en fonctionnement (recherche Wikipédia)",bodyNote:"Je suis votre tutrice. Je cherche d'abord dans le petit manuel intégré ; si ce n'est pas là, je cherche dans Wikipédia.",notFound:"Introuvable. Essayez avec d'autres mots.",placeholder:"Ex. : Qu'est-ce que le cycle de l'eau ?",searching:"Recherche…",builtinSrc:"Manuel intégré"},
+  de:{appTitle:"Haruka Bildungs-KI — Version 2",libraryHeading:"Nachschlagen (Wikipedia-Suche)",qHeading:"Frage",aHeading:"Antwort",sendBtn:"Senden",statusText:"● Bildungs-KI läuft (Wikipedia-Suche)",bodyNote:"Ich bin deine Hauslehrerin. Zuerst suche ich im kleinen eingebauten Lehrbuch; wenn es dort nicht steht, suche ich in Wikipedia.",notFound:"Nicht gefunden. Bitte versuch es mit anderen Wörtern.",placeholder:"Z. B.: Was ist der Wasserkreislauf?",searching:"Suche läuft…",builtinSrc:"Eingebautes Lehrbuch"},
+  ru:{appTitle:"Харука — образовательный ИИ, версия 2",libraryHeading:"Поиск (по Википедии)",qHeading:"Вопрос",aHeading:"Ответ",sendBtn:"Отправить",statusText:"● Образовательный ИИ работает (поиск по Википедии)",bodyNote:"Я ваш домашний учитель. Сначала ищу в маленьком встроенном учебнике, а если там нет — в Википедии.",notFound:"Не нашлось. Попробуйте другими словами.",placeholder:"Например: что такое круговорот воды?",searching:"Ищем…",builtinSrc:"Встроенный учебник"},
+  ko:{appTitle:"하루카 교육 AI 버전 2",libraryHeading:"찾아보기 (위키피디아 검색)",qHeading:"질문",aHeading:"답변",sendBtn:"보내기",statusText:"● 교육 AI 작동 중 (위키피디아 검색형)",bodyNote:"여러분의 가정교사입니다. 먼저 내장된 작은 교과서를 찾고, 없으면 위키피디아에서 찾습니다.",notFound:"찾지 못했습니다. 말을 바꿔서 다시 찾아 보세요.",placeholder:"예: 물의 순환이란 무엇인가요?",searching:"찾는 중…",builtinSrc:"내장 교과서"}
 };
 UI_DICT["zh"] = UI_DICT["zh-CN"];
 UI_DICT["pt-BR"] = UI_DICT["pt"];
@@ -538,7 +692,10 @@ function showParagraph(i) {
   const lbtn = document.createElement("button");
   lbtn.className = "bookBtn";
   lbtn.textContent = "講義を聞く";
-  lbtn.onclick = () => speakLecture(i);
+  lbtn.onclick = () => {
+    if (window.isLectureActive && window.isLectureActive()) { window.stopLecture(); lbtn.textContent = "講義を聞く"; return; }
+    speakLecture(i, lbtn);
+  };
   aEl.appendChild(document.createElement("br"));
   aEl.appendChild(lbtn);
   if (aEl.scrollIntoView) aEl.scrollIntoView({behavior:"smooth", block:"start"});
@@ -550,15 +707,43 @@ function toggleBooks() {
 }
 
 
-// ===== 講義（家庭教師として声で講義する） =====
-function speakLecture(i) {
+// ===== 講義（家庭教師として声で講義する。第50号の講義部品で順番に読む） =====
+const LECTURE_FRAME = {
+  "ja":    { intro: (b, t) => "今日の講義は、" + b + "の『" + t + "』です。", closing: "以上です。分からないところは、質問してください。" },
+  "en":    { intro: (b, t) => "Today's lecture is '" + t + "' from " + b + ".", closing: "That's all. If anything is unclear, please ask." },
+  "zh-CN": { intro: (b, t) => "今天的讲课是《" + b + "》中的『" + t + "』。", closing: "讲完了。有不懂的地方请提问。" },
+  "es":    { intro: (b, t) => "La lección de hoy es «" + t + "» de " + b + ".", closing: "Eso es todo. Si algo no quedó claro, pregunten." },
+  "pt":    { intro: (b, t) => "A aula de hoje é «" + t + "» de " + b + ".", closing: "É tudo. Se algo não ficou claro, perguntem." },
+  "fr":    { intro: (b, t) => "Le cours d'aujourd'hui est « " + t + " » de " + b + ".", closing: "C'est tout. Si quelque chose n'est pas clair, demandez." },
+  "de":    { intro: (b, t) => "Die heutige Stunde ist ‚" + t + "' aus " + b + ".", closing: "Das ist alles. Wenn etwas unklar ist, fragt bitte." },
+  "ru":    { intro: (b, t) => "Сегодняшний урок — «" + t + "» из книги " + b + ".", closing: "Это всё. Если что-то непонятно, спрашивайте." },
+  "ko":    { intro: (b, t) => "오늘의 강의는 " + b + "의 '" + t + "'입니다.", closing: "이상입니다. 모르는 곳은 질문해 주세요." }
+};
+function noteVoiceMissing(lang) {
+  try {
+    if (!("speechSynthesis" in window) || !window.pickVoiceForLang || !window.getVoiceMissingMessage) return;
+    const vs = window.speechSynthesis.getVoices();
+    if (vs && vs.length > 0 && !window.pickVoiceForLang(lang)) {
+      const el = document.getElementById("statusText");
+      const orig = langPack(curLang).statusText;
+      el.textContent = window.getVoiceMissingMessage(lang);
+      setTimeout(() => { el.textContent = orig; }, 5000);
+    }
+  } catch (e) {}
+}
+function speakLecture(i, btn) {
   const p = BUILTIN[i];
   if (!("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined") return;
-  let text = p.text;
-  if (curLang === "ja") {
-    text = "今日の講義は、" + p.bookTitle + "の『" + p.chapterTitle + "』です。" + p.text + " 以上です。分からないところは、質問してください。";
-  }
-  speakAs("haruka", text, voiceCompLang());
+  const lang = voiceCompLang();
+  noteVoiceMissing(lang);
+  const f = LECTURE_FRAME[curLang] || LECTURE_FRAME.en;
+  if (btn) btn.textContent = "講義を止める";
+  window.startLecture(p.chapterTitle, p.text, {
+    lang: lang,
+    intro: f.intro(p.bookTitle, p.chapterTitle),
+    closing: f.closing,
+    onEnd: () => { if (btn) btn.textContent = "講義を聞く"; }
+  });
 }
 // ハルカの言語コードを声部品のコードへ変換（zh-CN -> zh）
 function voiceCompLang() { return curLang === "zh-CN" ? "zh" : curLang; }
@@ -571,6 +756,7 @@ function toggleVoice() {
   const aEl = document.getElementById("answerBox");
   let text = aEl.textContent.trim();
   if (!text) text = document.getElementById("bodyNote").textContent;
+  noteVoiceMissing(voiceCompLang());
   speakAs("haruka", text, voiceCompLang());
   btn.textContent = "止める";
   // 読み終わったらボタンの表示を戻す
